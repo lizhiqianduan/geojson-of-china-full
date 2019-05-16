@@ -87,7 +87,7 @@ function getListItemRecursion(list,index,hasChildren,progressCb,endCb) {
 		progressCb && progressCb(err,data,list[index],index);
 		setTimeout(function () {
 			getListItemRecursion(list,++index,hasChildren,progressCb,endCb);
-		},100);
+		},20);
 	});
 }
 
