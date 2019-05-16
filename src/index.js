@@ -99,6 +99,7 @@ function logError(log){
 function httpsGet(url,cb) {
 	https.get(url,function (res) {
 		if(res.statusCode!==200) return cb({message:"状态不等于200！"});
+		res.setTimeout(5000);
 		res.setEncoding('utf8');
 		var rawData = '';
 		res.on('data', function(chunk){ rawData += chunk; });
