@@ -8,7 +8,11 @@
 下载/克隆之后输入命令即可
 
 ```
+# 更新不带子级的数据
 npm run update
+
+# 更新带子级的数据
+npm run update full
 ```
 
 # 更新日志
