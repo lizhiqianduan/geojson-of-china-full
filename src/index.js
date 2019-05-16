@@ -6,33 +6,65 @@ var fs = require('fs');
 logLog('1、获取行政区域列表...');
 httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, data) {
 	if(err) return logError('获取行政区域失败！',err);
-	
 	writeFile('area',data);
-	
-	logLog('1、获取行政区域列表成功！');
+	logLog('1、获取行政区域列表成功！','area');
 	
 	var list = JSON.parse(data);
-	getListItemRecursion(list,0,function (err, data,item,index) {
-		writeFile(item.adcode,data);
-		logLog('下标：',index,'名称：',item.name,"ID：",item.adcode,"写入成功！");
-	},function () {
-	
+	logLog('2、开始获取不带子级的GeoJSON...');
+	getData(list,false,function (errorItems1) {
+		logLog('2、开始获取不带子级的GeoJSON获取完成！');
+		
+		logLog('3、开始获取带子级的GeoJSON...');
+		getData(list,true,function (errorItems2) {
+			logLog('3、开始获取带子级的GeoJSON获取完成！');
+			
+			logLog('全部完成！获取结果如下：');
+			if(errorItems1.length===0 && errorItems2.length===0) return logLog('全部获取成功！');
+			if(errorItems1.length>0){
+				logError('不带子级存在失败的数据：',errorItems1);
+			}
+			if(errorItems1.length>0){
+				logError('带子级存在失败的数据：',errorItems2);
+			}
+		});
 	});
 });
+
+function getData(list,isFull,endCb) {
+	var errorItems = [];
+	getListItemRecursion(list,0,false,function (err, data,item,index) {
+		if(err) {
+			errorItems.push({index:index,name:item.name,adcode:item.adcode,err:err});
+			return logError('下标：',index,"ID：",item.adcode,item.name,"获取失败！");
+		}
+		try{
+			var filename = item.adcode+(isFull?"_full":"");
+			writeFile(filename,data);
+			logLog('下标：',index,"filename：",filename,item.name,"写入成功！");
+		}catch (e){
+			errorItems.push({index:index,name:item.name,adcode:item.adcode,err:e});
+			return logError('下标：',index,"ID：",item.adcode,item.name,"写入失败！");
+		}
+	},function () {
+		endCb(errorItems);
+	});
+	
+}
 
 /**
  * 递归获取json
  * @param list
  * @param index
+ * @param hasChildren 是否包含子级
  * @param progressCb
  * @param endCb
  */
-function getListItemRecursion(list,index,progressCb,endCb) {
+function getListItemRecursion(list,index,hasChildren,progressCb,endCb) {
 	if(index===list.length-1) return endCb();
-	httpsGet("https://geo.datav.aliyun.com/areas/bound/"+list[index].adcode+"_full.json",function (err, data) {
+	httpsGet("https://geo.datav.aliyun.com/areas/bound/"+list[index].adcode+(hasChildren?"_full":"")+".json",function (err, data) {
 		progressCb && progressCb(err,data,list[index],index);
 		setTimeout(function () {
-			getListItemRecursion(list,++index,progressCb,endCb);
+			getListItemRecursion(list,++index,hasChildren,progressCb,endCb);
 		},100);
 	});
 }
@@ -63,5 +95,7 @@ function httpsGet(url,cb) {
 		res.on('end', function(){
 			cb(null,rawData);
 		});
+	}).on('error', function(e){
+		cb(e);
 	});
 }

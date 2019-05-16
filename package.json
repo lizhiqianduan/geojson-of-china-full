@@ -1,0 +1,19 @@
+{
+  "name": "geojson-of-china-full",
+  "version": "1.0.0",
+  "description": "全国行政区域json文件，根据行政区域id命名，包含省市区",
+  "main": "./src/index.js",
+  "scripts": {
+    "update": "node src/index"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lizhiqianduan/geojson-of-china-full.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lizhiqianduan/geojson-of-china-full/issues"
+  },
+  "homepage": "https://github.com/lizhiqianduan/geojson-of-china-full#readme"
+}
