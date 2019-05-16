@@ -9,7 +9,8 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 	writeFile('area',data);
 	logLog('1、获取行政区域列表成功！','area');
 	
-	var list = JSON.parse(data);
+	var list = JSON.parse(data).slice(0,3);
+	
 	logLog('2、开始获取不带子级的GeoJSON...');
 	getData(list,false,function (errorItems1) {
 		logLog('2、开始获取不带子级的GeoJSON获取完成！');
@@ -21,10 +22,16 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 			logLog('全部完成！获取结果如下：');
 			if(errorItems1.length===0 && errorItems2.length===0) return logLog('全部获取成功！');
 			if(errorItems1.length>0){
-				logError('不带子级存在失败的数据：',errorItems1);
+				logError('不带子级存在失败的数据：');
+				errorItems1.forEach(function (t) {
+					logError(t.index,t.adcode,t.name,t.err?t.err.message:'');
+				})
 			}
-			if(errorItems1.length>0){
-				logError('带子级存在失败的数据：',errorItems2);
+			if(errorItems2.length>0){
+				logError('带子级存在失败的数据：');
+				errorItems2.forEach(function (t) {
+					logError(t.index,t.adcode,t.name,t.err?t.err.message:'');
+				})
 			}
 		});
 	});
@@ -32,7 +39,7 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 
 function getData(list,isFull,endCb) {
 	var errorItems = [];
-	getListItemRecursion(list,0,false,function (err, data,item,index) {
+	getListItemRecursion(list,0,isFull,function (err, data,item,index) {
 		if(err) {
 			errorItems.push({index:index,name:item.name,adcode:item.adcode,err:err});
 			return logError('下标：',index,"ID：",item.adcode,item.name,"获取失败！");
@@ -81,7 +88,9 @@ function logLog(log){
 }
 
 function logError(log){
-	console.log('\033[;31m','=>',log,'\033[0m')
+	Array.prototype.push.call(arguments,'\033[0m');
+	Array.prototype.unshift.call(arguments,'\033[;31m =>');
+	console.log.apply(this,arguments);
 }
 
 
@@ -89,6 +98,7 @@ function logError(log){
 
 function httpsGet(url,cb) {
 	https.get(url,function (res) {
+		if(res.statusCode!==200) return cb({message:"状态不等于200！"});
 		res.setEncoding('utf8');
 		var rawData = '';
 		res.on('data', function(chunk){ rawData += chunk; });
