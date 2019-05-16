@@ -9,7 +9,7 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 	writeFile('area',data);
 	logLog('1、获取行政区域列表成功！','area');
 	
-	var list = JSON.parse(data).slice(0,3);
+	var list = JSON.parse(data);
 	
 	logLog('2、开始获取不带子级的GeoJSON...');
 	getData(list,false,function (errorItems1) {
@@ -33,6 +33,21 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 					logError(t.index,t.adcode,t.name,t.err?t.err.message:'');
 				})
 			}
+			
+			logLog('=============================');
+			logLog('4、尝试重新获取失败的数据...');
+			errorItems1.forEach(function (t) {
+				getData(list.slice(t.index,t.index+1),false,function (errorItems1) {
+					if(errorItems1.length===0) return logLog(t.index,'尝试成功！');
+					else return logError(t.index,'尝试仍然失败！需手动获取！');
+				});
+			});
+			errorItems2.forEach(function (t) {
+				getData(list.slice(t.index,t.index+1),false,function (errorItems2) {
+					if(errorItems2.length===0) return logLog(t.index,'尝试成功！');
+					else return logError(t.index,'尝试仍然失败！需手动获取！');
+				});
+			});
 		});
 	});
 });
