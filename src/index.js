@@ -12,69 +12,55 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 	logLog('1、获取行政区域列表成功！','area');
 	
 	var list = JSON.parse(data);
-	
-	getData(list,isFull,function (errorItems2) {
-		logLog('3、开始获取带子级的GeoJSON获取完成！');
-		
-		logLog('全部完成！获取结果如下：');
-		if(errorItems2.length===0) return logLog('全部获取成功！');
-		
-		if(errorItems2.length>0){
-			logError('带子级存在失败的数据：');
-			errorItems2.forEach(function (t) {
-				logError(t.index,t.adcode,t.name,t.err?t.err.message:'');
-			})
-		}
-		
-		/*logLog('=============================');
-		logLog('4、尝试重新获取失败的数据...');
-		errorItems2.forEach(function (t) {
-			getData(list.slice(t.index,t.index+1),false,function (errorItems2) {
-				if(errorItems2.length===0) return logLog(t.index,'尝试成功！');
-				else return logError(t.index,'尝试仍然失败！需手动获取！');
-			});
-		});*/
+
+
+
+	// 拼装GeoJSON的url
+	var geoJsonUrls = list.map(function(item){
+		if(item.level!=="district")
+			return {item:item,url:"https://geo.datav.aliyun.com/areas/bound/"+item.adcode+(isFull?"_full":"")+".json"};
+		return {item:item};
 	});
+
+	// 拼装地区的url
+	var areaUrls = list.map(function(item){
+		var level = ['country','province','city','district'];
+		var index = level.indexOf(item.level);
+		if(index<3)
+			return {item:item,url:"https://geo.datav.aliyun.com/areas/csv/510000_"+(level[index+1])+".json"};
+		return {item:item};
+	});
+
+
+	// 获取GeoJSON
+	httpsGetList(geoJsonUrls,function (err,data,index,area){
+		var areaName = area.item.name;
+		if(err) return logError(index,areaName,'获取GeoJSON失败！',err.message);
+		logLog(index,areaName,'获取GeoJSON成功！');
+
+		var filename = area.item.adcode+"_geojson"+(isFull?"_full":"");
+		writeFile(filename,data);
+		logLog(index,areaName,'写入成功！',filename);
+	},()=>{
+
+		// 获取地区json
+		httpsGetList(areaUrls,function (err,data,index,area){
+			var areaName = area.item.name;
+			if(err) return logError(index,areaName,'获取area失败！',err.message);
+			logLog(index,areaName,'获取area成功！');
+
+			var filename = area.item.adcode+"_area";
+			writeFile(filename,data);
+			logLog(index,areaName,'写入成功！',filename);
+		});
+
+	});
+
+	
+
 });
 
-function getData(list,isFull,endCb) {
-	var errorItems = [];
-	getListItemRecursion(list,0,isFull,function (err, data,item,index) {
-		if(err) {
-			errorItems.push({index:index,name:item.name,adcode:item.adcode,err:err});
-			return logError('下标：',index,"ID：",item.adcode,item.name,"获取失败！");
-		}
-		try{
-			var filename = item.adcode+(isFull?"_full":"");
-			writeFile(filename,data);
-			logLog('下标：',index,"filename：",filename,item.name,"写入成功！");
-		}catch (e){
-			errorItems.push({index:index,name:item.name,adcode:item.adcode,err:e});
-			return logError('下标：',index,"ID：",item.adcode,item.name,"写入失败！");
-		}
-	},function () {
-		endCb(errorItems);
-	});
-	
-}
 
-/**
- * 递归获取json
- * @param list
- * @param index
- * @param hasChildren 是否包含子级
- * @param progressCb
- * @param endCb
- */
-function getListItemRecursion(list,index,hasChildren,progressCb,endCb) {
-	if(index===list.length-1) return endCb();
-	httpsGet("https://geo.datav.aliyun.com/areas/bound/"+list[index].adcode+(hasChildren?"_full":"")+".json",function (err, data) {
-		progressCb && progressCb(err,data,list[index],index);
-		setTimeout(function () {
-			getListItemRecursion(list,++index,hasChildren,progressCb,endCb);
-		},20);
-	});
-}
 
 function writeFile(filename, strData) {
 	var fd = fs.openSync('./data/'+filename+'.json','w+');
@@ -97,6 +83,8 @@ function logError(log){
 // 'https://geo.datav.aliyun.com/areas/bound/100000.json'
 
 function httpsGet(url,cb) {
+	if(!url) return cb({message:"url为空"});
+
 	https.get(url,function (res) {
 		if(res.statusCode!==200) return cb({message:"状态不等于200！"});
 		res.setTimeout(5000);
@@ -108,5 +96,32 @@ function httpsGet(url,cb) {
 		});
 	}).on('error', function(e){
 		cb(e);
+	});
+}
+
+function httpsGetList(urlObjList,progressCb,endCb,index){
+	index = index ||0;
+
+	// 县级地区忽略
+	if(urlObjList[index].item.level=='district'){
+		progressCb&&progressCb({message:"县级地区忽略！"},null,index,urlObjList[index]);
+		++index;
+		// 判断结尾
+		if(index===urlObjList.length-1) {
+			return endCb&&endCb();
+		}
+		httpsGetList(urlObjList,progressCb,endCb,index);
+		return;
+	}
+
+
+	httpsGet(urlObjList[index].url,(err,data)=>{
+		progressCb&&progressCb(err,data,index,urlObjList[index]);
+		++index;
+		// 判断结尾
+		if(index===urlObjList.length-1) {
+			return endCb&&endCb();
+		}
+		httpsGetList(urlObjList,progressCb,endCb,index);
 	});
 }
