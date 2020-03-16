@@ -2,7 +2,13 @@ var http = require('http');
 var https = require('https');
 var fs = require('fs');
 
+
+// 是否更新带子级的数据+区域数据，默认不带子级+区域数据
 var isFull = process.argv.slice(-1)[0]==="full";
+
+// 是否仅仅只更新区域
+var justArea = process.argv.slice(-1)[0]==="area";
+
 console.log(isFull);
 // 获取行政区域ID
 logLog('1、获取行政区域列表...');
@@ -27,10 +33,13 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 		var level = ['country','province','city','district'];
 		var index = level.indexOf(item.level);
 		if(index<3)
-			return {item:item,url:"https://geo.datav.aliyun.com/areas/csv/510000_"+(level[index+1])+".json"};
+			return {item:item,url:"https://geo.datav.aliyun.com/areas/csv/"+ item.adcode +"_"+(level[index+1])+".json"};
 		return {item:item};
 	});
 
+	// 判断是否只更新区域
+	if(justArea) geoJsonUrls = [];
+	
 
 	// 获取GeoJSON
 	httpsGetList(geoJsonUrls,function (err,data,index,area){
@@ -101,7 +110,10 @@ function httpsGet(url,cb) {
 
 function httpsGetList(urlObjList,progressCb,endCb,index){
 	index = index ||0;
-
+	
+	// 判断长度
+	if(urlObjList&&urlObjList.length===0) return endCb&&endCb();
+	
 	// 县级地区忽略
 	if(urlObjList[index].item.level=='district'){
 		progressCb&&progressCb({message:"县级地区忽略！"},null,index,urlObjList[index]);
