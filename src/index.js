@@ -12,33 +12,29 @@ var justArea = process.argv.slice(-1)[0]==="area";
 console.log(isFull);
 // 获取行政区域ID
 logLog('1、获取行政区域列表...');
-httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, data) {
+httpsGet("https://geo.datav.aliyun.com/areas_v2/bound/all.json",function (err, data) {
 	if(err) return logError('获取行政区域失败！',err);
 	writeFile('area',data);
 	logLog('1、获取行政区域列表成功！','area');
 	
 	var list = JSON.parse(data);
+	logLog('2、开始获取区域信息...');
+	getAreaData(list);
+	logLog('2、获取区域信息成功！');
+	if(justArea) return logLog("全部执行完毕！请前往data目录查看！");
 
 
 
 	// 拼装GeoJSON的url
 	var geoJsonUrls = list.map(function(item){
 		if(item.level!=="district")
-			return {item:item,url:"https://geo.datav.aliyun.com/areas/bound/"+item.adcode+(isFull?"_full":"")+".json"};
-		return {item:item};
-	});
-
-	// 拼装地区的url
-	var areaUrls = list.map(function(item){
-		var level = ['country','province','city','district'];
-		var index = level.indexOf(item.level);
-		if(index<3)
-			return {item:item,url:"https://geo.datav.aliyun.com/areas/csv/"+ item.adcode +"_"+(level[index+1])+".json"};
+			return {item:item,url:"https://geo.datav.aliyun.com/areas_v2/bound/"+item.adcode+(isFull?"_full":"")+".json"};
 		return {item:item};
 	});
 
 	// 判断是否只更新区域
 	if(justArea) geoJsonUrls = [];
+	logLog('需获取的总GeoJson数量：'+geoJsonUrls.length);
 	
 
 	// 获取GeoJSON
@@ -51,18 +47,7 @@ httpsGet("https://datav.aliyun.com/tools/atlas/data/all.json",function (err, dat
 		writeFile(filename,data);
 		logLog(index,areaName,'写入成功！',filename);
 	},()=>{
-
-		// 获取地区json
-		httpsGetList(areaUrls,function (err,data,index,area){
-			var areaName = area.item.name;
-			if(err) return logError(index,areaName,'获取area失败！',err.message);
-			logLog(index,areaName,'获取area成功！');
-
-			var filename = area.item.adcode+"_area";
-			writeFile(filename,data);
-			logLog(index,areaName,'写入成功！',filename);
-		});
-
+		logLog("全部执行完毕！请前往data目录查看！");
 	});
 
 	
@@ -135,5 +120,30 @@ function httpsGetList(urlObjList,progressCb,endCb,index){
 			return endCb&&endCb();
 		}
 		httpsGetList(urlObjList,progressCb,endCb,index);
+	});
+}
+
+/**
+ * 从全量数据中获取各个省、市的子区域
+ */
+function getAreaData(list){
+	list.forEach(function(item,index){
+		var adcode = item.adcode;
+		var areaName = item.name;
+
+		// 过滤区县级
+		if(item.level==='district') return logError(index,areaName,'县级地区忽略！');
+
+		// 写入文件的内容
+		var res = {rows:[],total:0};
+		list.forEach(function(element){
+			if(element.parent===adcode){
+				res.rows.push(element);
+			}
+		});
+		res.total = res.rows.length;
+		var filename = adcode+"_area";
+		writeFile(filename,JSON.stringify(res));
+		logLog(index,areaName,'写入成功！',filename);
 	});
 }
